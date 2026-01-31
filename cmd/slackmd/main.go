@@ -6,10 +6,12 @@ import (
 	"io"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/snormore/slackmd"
 )
 
 func main() {
+	_ = godotenv.Load()
 	post := flag.Bool("post", false, "post to Slack webhook instead of printing")
 	webhook := flag.String("webhook", "", "webhook URL (overrides SLACK_WEBHOOK_URL)")
 	flag.Parse()
