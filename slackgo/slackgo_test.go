@@ -255,6 +255,22 @@ func TestSleep_ContextCanceled(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_SlackMrkdwnLink(t *testing.T) {
+	blocks := ConvertBlocks("<https://google.com|Google>")
+	rt := blocks[0].(*slack.RichTextBlock)
+	section := rt.Elements[0].(*slack.RichTextSection)
+	link, ok := section.Elements[0].(*slack.RichTextSectionLinkElement)
+	if !ok {
+		t.Fatalf("expected LinkElement, got %T", section.Elements[0])
+	}
+	if link.URL != "https://google.com" {
+		t.Errorf("expected URL 'https://google.com', got %q", link.URL)
+	}
+	if link.Text != "Google" {
+		t.Errorf("expected text 'Google', got %q", link.Text)
+	}
+}
+
 func TestConvertBlocks_Emoji(t *testing.T) {
 	blocks := ConvertBlocks("Hello :wave: world :tada:")
 	rt := blocks[0].(*slack.RichTextBlock)

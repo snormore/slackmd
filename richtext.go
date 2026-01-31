@@ -420,7 +420,12 @@ func collectInlinesWalk(source []byte, node ast.Node, style InlineStyle, inlines
 		case ast.KindAutoLink:
 			n := child.(*ast.AutoLink)
 			url := string(n.URL(source))
-			*inlines = append(*inlines, Inline{Type: "link", URL: url})
+			inline := Inline{Type: "link", URL: url}
+			if i := strings.Index(url, "|"); i >= 0 {
+				inline.URL = url[:i]
+				inline.Text = url[i+1:]
+			}
+			*inlines = append(*inlines, inline)
 		case ast.KindRawHTML:
 			n := child.(*ast.RawHTML)
 			for i := 0; i < n.Segments.Len(); i++ {

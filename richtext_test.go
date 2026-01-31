@@ -565,6 +565,57 @@ func TestConvertBlocks_EmojiInStyledText(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_SlackMrkdwnLink(t *testing.T) {
+	blocks := ConvertBlocks("<https://google.com|Google>")
+	elems := inlines(t, blocks[0].Elements[0])
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 inline, got %d", len(elems))
+	}
+	if elems[0].Type != "link" {
+		t.Fatalf("expected link, got %q", elems[0].Type)
+	}
+	if elems[0].URL != "https://google.com" {
+		t.Errorf("expected URL 'https://google.com', got %q", elems[0].URL)
+	}
+	if elems[0].Text != "Google" {
+		t.Errorf("expected text 'Google', got %q", elems[0].Text)
+	}
+}
+
+func TestConvertBlocks_SlackMrkdwnLinkNoText(t *testing.T) {
+	blocks := ConvertBlocks("<https://google.com>")
+	elems := inlines(t, blocks[0].Elements[0])
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 inline, got %d", len(elems))
+	}
+	if elems[0].URL != "https://google.com" {
+		t.Errorf("expected URL 'https://google.com', got %q", elems[0].URL)
+	}
+	if elems[0].Text != "" {
+		t.Errorf("expected empty text, got %q", elems[0].Text)
+	}
+}
+
+func TestConvertBlocks_SlackMrkdwnLinkInSentence(t *testing.T) {
+	blocks := ConvertBlocks("Check <https://example.com/query?sql=SELECT|Q1>. How many?")
+	elems := inlines(t, blocks[0].Elements[0])
+	foundLink := false
+	for _, e := range elems {
+		if e.Type == "link" {
+			foundLink = true
+			if e.URL != "https://example.com/query?sql=SELECT" {
+				t.Errorf("expected URL without pipe text, got %q", e.URL)
+			}
+			if e.Text != "Q1" {
+				t.Errorf("expected text 'Q1', got %q", e.Text)
+			}
+		}
+	}
+	if !foundLink {
+		t.Error("expected a link element")
+	}
+}
+
 func TestConvertBlocks_NoFalseEmoji(t *testing.T) {
 	// Colons in normal text shouldn't be treated as emoji
 	blocks := ConvertBlocks("time is 10:30:00")
