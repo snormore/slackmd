@@ -14,9 +14,9 @@ import (
 // fakePoster implements the poster interface for testing.
 type fakePoster struct {
 	calls    atomic.Int32
-	failN    int            // fail this many times before succeeding
-	err      error          // error to return on failure
-	returnTS string         // timestamp to return on success
+	failN    int    // fail this many times before succeeding
+	err      error  // error to return on failure
+	returnTS string // timestamp to return on success
 }
 
 func (f *fakePoster) PostMessageContext(_ context.Context, _ string, _ ...slack.MsgOption) (string, string, error) {
