@@ -161,7 +161,7 @@ func TestConvert(t *testing.T) {
 		{
 			name:  "simple table",
 			input: "| A | B |\n|---|---|\n| 1 | 2 |",
-			expected: "```\nA | B\n─-+-─\n1 | 2\n```\n",
+			expected: "```\n+---+---+\n| A | B |\n+---+---+\n| 1 | 2 |\n+---+---+\n```\n",
 		},
 
 		// Multiple blocks

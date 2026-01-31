@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/yuin/goldmark/ast"
 	east "github.com/yuin/goldmark/extension/ast"
@@ -419,30 +418,9 @@ func (r *SlackRenderer) renderTable(w util.BufWriter, source []byte, node ast.No
 			return ast.WalkSkipChildren, nil
 		}
 
-		// Calculate column widths
-		colWidths := r.calcColumnWidths(rows)
-
 		w.WriteString("```\n")
-		for i, row := range rows {
-			for j, cell := range row {
-				if j > 0 {
-					w.WriteString(" | ")
-				}
-				padded := cell + strings.Repeat(" ", colWidths[j]-utf8.RuneCountInString(cell))
-				w.WriteString(padded)
-			}
-			w.WriteByte('\n')
-			if i == 0 {
-				// Separator
-				for j := range row {
-					if j > 0 {
-						w.WriteString("-+-")
-					}
-					w.WriteString(strings.Repeat("─", colWidths[j]))
-				}
-				w.WriteByte('\n')
-			}
-		}
+		w.WriteString(formatTable(rows))
+		w.WriteByte('\n')
 		w.WriteString("```\n")
 		return ast.WalkSkipChildren, nil
 	}
@@ -524,27 +502,6 @@ func (r *SlackRenderer) renderInlineNode(buf *bytes.Buffer, source []byte, node 
 	}
 }
 
-func (r *SlackRenderer) calcColumnWidths(rows [][]string) []int {
-	if len(rows) == 0 {
-		return nil
-	}
-	maxCols := 0
-	for _, row := range rows {
-		if len(row) > maxCols {
-			maxCols = len(row)
-		}
-	}
-	widths := make([]int, maxCols)
-	for _, row := range rows {
-		for j, cell := range row {
-			w := utf8.RuneCountInString(cell)
-			if w > widths[j] {
-				widths[j] = w
-			}
-		}
-	}
-	return widths
-}
 
 func (r *SlackRenderer) renderTableHeader(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return ast.WalkContinue, nil

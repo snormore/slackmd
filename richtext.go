@@ -3,7 +3,6 @@ package slackmd
 import (
 	"bytes"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -393,32 +392,7 @@ func renderPlainText(buf *bytes.Buffer, source []byte, node ast.Node) {
 func renderTableBlock(source []byte, node ast.Node) Element {
 	table := node.(*east.Table)
 	rows := collectTableRowsRT(source, table)
-	if len(rows) == 0 {
-		return Element{Type: "rich_text_preformatted", Elements: []Inline{{Type: "text", Text: ""}}}
-	}
-
-	colWidths := calcColWidths(rows)
-	var buf bytes.Buffer
-	for i, row := range rows {
-		for j, cell := range row {
-			if j > 0 {
-				buf.WriteString(" | ")
-			}
-			padded := cell + strings.Repeat(" ", colWidths[j]-utf8.RuneCountInString(cell))
-			buf.WriteString(padded)
-		}
-		buf.WriteByte('\n')
-		if i == 0 {
-			for j := range row {
-				if j > 0 {
-					buf.WriteString("-+-")
-				}
-				buf.WriteString(strings.Repeat("─", colWidths[j]))
-			}
-			buf.WriteByte('\n')
-		}
-	}
-	text := strings.TrimRight(buf.String(), "\n")
+	text := formatTable(rows)
 	return Element{Type: "rich_text_preformatted", Elements: []Inline{{Type: "text", Text: text}}}
 }
 
@@ -438,22 +412,4 @@ func collectTableRowsRT(source []byte, table *east.Table) [][]string {
 	return rows
 }
 
-func calcColWidths(rows [][]string) []int {
-	maxCols := 0
-	for _, row := range rows {
-		if len(row) > maxCols {
-			maxCols = len(row)
-		}
-	}
-	widths := make([]int, maxCols)
-	for _, row := range rows {
-		for j, cell := range row {
-			w := utf8.RuneCountInString(cell)
-			if w > widths[j] {
-				widths[j] = w
-			}
-		}
-	}
-	return widths
-}
 
