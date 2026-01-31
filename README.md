@@ -27,7 +27,7 @@ err = slackmd.PostMrkdwn(webhookURL, output)
 chunks := slackmd.Chunk(text, 3900)
 ```
 
-`Post()` and `PostBlocks()` use Slack's rich_text block format, which supports native nested lists, blockquotes, and styled text. `PostMrkdwn()` sends plain mrkdwn text for simpler use cases. Long mrkdwn messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
+`Post()` and `PostBlocks()` use Slack's rich_text block format, which supports native nested lists, blockquotes, styled text, headers, dividers, and image blocks. Messages with more than 50 blocks are automatically split into multiple posts. `PostMrkdwn()` sends plain mrkdwn text for simpler use cases. Long mrkdwn messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
 
 ## CLI
 
@@ -88,4 +88,9 @@ echo "hello from slackmd" | slackmd -post
 
 # Post a full example
 slackmd -post examples/mixed.md
+
+# Try other examples
+slackmd examples/release-notes.md
+slackmd examples/long-form.md
+slackmd examples/tables.md
 ```

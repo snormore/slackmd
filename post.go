@@ -19,8 +19,27 @@ func Post(webhookURL, markdown string) error {
 	return PostBlocks(webhookURL, blocks)
 }
 
+const maxBlocksPerMessage = 50
+
 // PostBlocks posts rich_text blocks to the given webhook URL.
+// Long messages are automatically split into multiple posts of up to 50 blocks each.
 func PostBlocks(webhookURL string, blocks []Block) error {
+	for i := 0; i < len(blocks); i += maxBlocksPerMessage {
+		end := i + maxBlocksPerMessage
+		if end > len(blocks) {
+			end = len(blocks)
+		}
+		if i > 0 {
+			time.Sleep(time.Second)
+		}
+		if err := postBlocks(webhookURL, blocks[i:end]); err != nil {
+			return fmt.Errorf("posting blocks %d–%d of %d: %w", i+1, end, len(blocks), err)
+		}
+	}
+	return nil
+}
+
+func postBlocks(webhookURL string, blocks []Block) error {
 	payload := map[string]interface{}{
 		"blocks": blocks,
 	}

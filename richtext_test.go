@@ -429,3 +429,79 @@ func TestConvertBlocks_StyledMerging(t *testing.T) {
 		t.Fatal("second inline should have no style")
 	}
 }
+
+func TestConvertBlocks_ConsecutiveHeadings(t *testing.T) {
+	blocks := ConvertBlocks("# First\n\n## Second\n\n### Third")
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 blocks, got %d", len(blocks))
+	}
+	for i, b := range blocks {
+		if b.Type != "header" {
+			t.Fatalf("block %d: expected header, got %s", i, b.Type)
+		}
+	}
+	if blocks[0].Text.Text != "First" {
+		t.Fatalf("expected 'First', got %q", blocks[0].Text.Text)
+	}
+	if blocks[1].Text.Text != "Second" {
+		t.Fatalf("expected 'Second', got %q", blocks[1].Text.Text)
+	}
+	if blocks[2].Text.Text != "Third" {
+		t.Fatalf("expected 'Third', got %q", blocks[2].Text.Text)
+	}
+}
+
+func TestConvertBlocks_ConsecutiveDividers(t *testing.T) {
+	blocks := ConvertBlocks("---\n\n---\n\n---")
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 blocks, got %d", len(blocks))
+	}
+	for i, b := range blocks {
+		if b.Type != "divider" {
+			t.Fatalf("block %d: expected divider, got %s", i, b.Type)
+		}
+	}
+}
+
+func TestConvertBlocks_SpacerBetweenRichTextElements(t *testing.T) {
+	// Two paragraphs should accumulate into one rich_text block with a spacer between them
+	blocks := ConvertBlocks("first paragraph\n\nsecond paragraph")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	elems := blocks[0].Elements
+	// Should be: section, spacer, section = 3 elements
+	if len(elems) != 3 {
+		t.Fatalf("expected 3 elements (section+spacer+section), got %d", len(elems))
+	}
+	spacerInlines := inlines(t, elems[1])
+	if len(spacerInlines) != 1 || spacerInlines[0].Text != "\n" {
+		t.Fatal("expected spacer element with newline text")
+	}
+}
+
+func TestConvertBlocks_ImageNoAltText(t *testing.T) {
+	blocks := ConvertBlocks("![](https://example.com/img.png)")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].Type != "image" {
+		t.Fatalf("expected image block, got %s", blocks[0].Type)
+	}
+	if blocks[0].AltText != "image" {
+		t.Fatalf("expected default alt text 'image', got %q", blocks[0].AltText)
+	}
+}
+
+func TestConvertBlocks_HeadingFormattingStripped(t *testing.T) {
+	blocks := ConvertBlocks("# **bold** heading")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].Type != "header" {
+		t.Fatalf("expected header block, got %s", blocks[0].Type)
+	}
+	if blocks[0].Text.Text != "bold heading" {
+		t.Fatalf("expected 'bold heading', got %q", blocks[0].Text.Text)
+	}
+}
