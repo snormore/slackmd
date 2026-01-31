@@ -1,7 +1,9 @@
 package slackgo
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/snormore/slackmd"
@@ -183,6 +185,47 @@ func TestPostOptions(t *testing.T) {
 	WithFallbackText("fallback")(&o)
 	if o.fallbackText != "fallback" {
 		t.Errorf("expected fallbackText 'fallback', got %q", o.fallbackText)
+	}
+
+	WithRetry(nil)(&o)
+	if o.retry == nil {
+		t.Fatal("expected default retry config, got nil")
+	}
+	if o.retry.MaxAttempts != 3 {
+		t.Errorf("expected 3 max attempts, got %d", o.retry.MaxAttempts)
+	}
+
+	custom := &RetryConfig{MaxAttempts: 5, InitialWait: 2 * time.Second, MaxWait: 10 * time.Second}
+	var o2 postOptions
+	WithRetry(custom)(&o2)
+	if o2.retry.MaxAttempts != 5 {
+		t.Errorf("expected 5 max attempts, got %d", o2.retry.MaxAttempts)
+	}
+}
+
+func TestBackoff(t *testing.T) {
+	cfg := &RetryConfig{InitialWait: time.Second, MaxWait: 10 * time.Second}
+	if d := backoff(0, cfg); d != time.Second {
+		t.Errorf("attempt 0: expected 1s, got %s", d)
+	}
+	if d := backoff(1, cfg); d != 2*time.Second {
+		t.Errorf("attempt 1: expected 2s, got %s", d)
+	}
+	if d := backoff(2, cfg); d != 4*time.Second {
+		t.Errorf("attempt 2: expected 4s, got %s", d)
+	}
+	// Should cap at MaxWait
+	if d := backoff(10, cfg); d != 10*time.Second {
+		t.Errorf("attempt 10: expected 10s (max), got %s", d)
+	}
+}
+
+func TestSleep_ContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := sleep(ctx, time.Minute)
+	if err != context.Canceled {
+		t.Errorf("expected context.Canceled, got %v", err)
 	}
 }
 

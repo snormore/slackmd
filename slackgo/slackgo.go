@@ -3,6 +3,10 @@
 package slackgo
 
 import (
+	"context"
+	"math"
+	"time"
+
 	"github.com/slack-go/slack"
 	"github.com/snormore/slackmd"
 )
@@ -27,6 +31,20 @@ type PostOption func(*postOptions)
 type postOptions struct {
 	threadTS     string
 	fallbackText string
+	retry        *RetryConfig
+}
+
+// RetryConfig controls retry behavior for Post.
+type RetryConfig struct {
+	MaxAttempts int           // maximum number of attempts (default 3)
+	InitialWait time.Duration // initial backoff duration (default 1s)
+	MaxWait     time.Duration // maximum backoff duration (default 30s)
+}
+
+var defaultRetryConfig = RetryConfig{
+	MaxAttempts: 3,
+	InitialWait: time.Second,
+	MaxWait:     30 * time.Second,
 }
 
 // WithThreadTS sets the thread timestamp to reply in a thread.
@@ -39,9 +57,21 @@ func WithFallbackText(text string) PostOption {
 	return func(o *postOptions) { o.fallbackText = text }
 }
 
-// Post converts markdown to slack-go blocks and posts via client.PostMessage.
+// WithRetry enables retry with exponential backoff. Pass nil for defaults.
+func WithRetry(cfg *RetryConfig) PostOption {
+	return func(o *postOptions) {
+		if cfg != nil {
+			o.retry = cfg
+		} else {
+			c := defaultRetryConfig
+			o.retry = &c
+		}
+	}
+}
+
+// Post converts markdown to slack-go blocks and posts via client.PostMessageContext.
 // Returns the response timestamp of the posted message.
-func Post(api *slack.Client, channel, markdown string, opts ...PostOption) (string, error) {
+func Post(ctx context.Context, api *slack.Client, channel, markdown string, opts ...PostOption) (string, error) {
 	var o postOptions
 	for _, opt := range opts {
 		opt(&o)
@@ -57,8 +87,54 @@ func Post(api *slack.Client, channel, markdown string, opts ...PostOption) (stri
 		msgOpts = append(msgOpts, slack.MsgOptionText(o.fallbackText, false))
 	}
 
-	_, ts, err := api.PostMessage(channel, msgOpts...)
+	if o.retry == nil {
+		_, ts, err := api.PostMessageContext(ctx, channel, msgOpts...)
+		return ts, err
+	}
+
+	var ts string
+	var err error
+	for attempt := range o.retry.MaxAttempts {
+		_, ts, err = api.PostMessageContext(ctx, channel, msgOpts...)
+		if err == nil {
+			return ts, nil
+		}
+		if rateLimitedErr, ok := err.(*slack.RateLimitedError); ok {
+			wait := rateLimitedErr.RetryAfter
+			if wait == 0 {
+				wait = backoff(attempt, o.retry)
+			}
+			if err := sleep(ctx, wait); err != nil {
+				return "", err
+			}
+			continue
+		}
+		if attempt < o.retry.MaxAttempts-1 {
+			if err := sleep(ctx, backoff(attempt, o.retry)); err != nil {
+				return "", err
+			}
+		}
+	}
 	return ts, err
+}
+
+func backoff(attempt int, cfg *RetryConfig) time.Duration {
+	d := time.Duration(float64(cfg.InitialWait) * math.Pow(2, float64(attempt)))
+	if d > cfg.MaxWait {
+		d = cfg.MaxWait
+	}
+	return d
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func convertBlock(b slackmd.Block) slack.Block {

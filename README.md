@@ -41,12 +41,13 @@ If you use [slack-go](https://github.com/slack-go/slack)'s `client.PostMessage`,
 import "github.com/snormore/slackmd/slackgo"
 
 // Convert and post in one call
-ts, err := slackgo.Post(api, "#channel", "**bold** and _italic_")
+ts, err := slackgo.Post(ctx, api, "#channel", "**bold** and _italic_")
 
-// Reply in a thread
-_, err = slackgo.Post(api, "#channel", "threaded reply",
+// Reply in a thread with retry
+_, err = slackgo.Post(ctx, api, "#channel", "threaded reply",
 	slackgo.WithThreadTS(ts),
 	slackgo.WithFallbackText("threaded reply"),
+	slackgo.WithRetry(nil), // sensible defaults: 3 attempts, exponential backoff
 )
 
 // Or convert to []slack.Block for custom use
