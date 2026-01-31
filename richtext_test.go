@@ -227,3 +227,156 @@ func TestConvertBlocks_Empty(t *testing.T) {
 		t.Fatalf("expected 0 blocks, got %d", len(blocks))
 	}
 }
+
+func TestConvertBlocks_ThematicBreak(t *testing.T) {
+	blocks := ConvertBlocks("above\n\n---\n\nbelow")
+	found := false
+	for _, elem := range blocks[0].Elements {
+		il, ok := elem.Elements.([]Inline)
+		if ok && len(il) == 1 && il[0].Text == "———" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected thematic break element with ——— text")
+	}
+}
+
+func TestConvertBlocks_Image(t *testing.T) {
+	blocks := ConvertBlocks("![alt text](https://example.com/img.png)")
+	il := inlines(t, blocks[0].Elements[0])
+	foundAlt := false
+	foundLink := false
+	for _, in := range il {
+		if in.Type == "text" && in.Text == "alt text " {
+			foundAlt = true
+		}
+		if in.Type == "link" && in.URL == "https://example.com/img.png" {
+			foundLink = true
+		}
+	}
+	if !foundAlt {
+		t.Fatal("expected alt text inline")
+	}
+	if !foundLink {
+		t.Fatal("expected image link inline")
+	}
+}
+
+func TestConvertBlocks_AutoLink(t *testing.T) {
+	blocks := ConvertBlocks("visit https://example.com for info")
+	il := inlines(t, blocks[0].Elements[0])
+	found := false
+	for _, in := range il {
+		if in.Type == "link" && in.URL == "https://example.com" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected autolink inline")
+	}
+}
+
+func TestConvertBlocks_MultiParagraphQuote(t *testing.T) {
+	blocks := ConvertBlocks("> line one\n>\n> line two")
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_quote" {
+		t.Fatalf("expected rich_text_quote, got %s", elem.Type)
+	}
+	il := inlines(t, elem)
+	// Should have a newline separator between paragraphs
+	hasNewline := false
+	for _, in := range il {
+		if in.Text == "\n" {
+			hasNewline = true
+		}
+	}
+	if !hasNewline {
+		t.Fatal("expected newline separator between quote paragraphs")
+	}
+}
+
+func TestConvertBlocks_BoldItalicCombined(t *testing.T) {
+	blocks := ConvertBlocks("***bold and italic***")
+	il := inlines(t, blocks[0].Elements[0])
+	if len(il) != 1 {
+		t.Fatalf("expected 1 inline, got %d", len(il))
+	}
+	if il[0].Style == nil || !il[0].Style.Bold || !il[0].Style.Italic {
+		t.Fatal("expected bold+italic style")
+	}
+}
+
+func TestConvertBlocks_LinkWithFormatting(t *testing.T) {
+	blocks := ConvertBlocks("[**bold link**](https://example.com)")
+	il := inlines(t, blocks[0].Elements[0])
+	if il[0].Type != "link" {
+		t.Fatalf("expected link, got %s", il[0].Type)
+	}
+	if il[0].URL != "https://example.com" {
+		t.Fatalf("expected URL, got %q", il[0].URL)
+	}
+}
+
+func TestConvertBlocks_MixedList(t *testing.T) {
+	// Bullet list with nested ordered list
+	md := "- a\n  1. one\n  2. two\n- b"
+	blocks := ConvertBlocks(md)
+	elems := blocks[0].Elements
+	// Should have bullet items and ordered sub-items
+	foundBullet := false
+	foundOrdered := false
+	for _, e := range elems {
+		if e.Type == "rich_text_list" && e.Style == "bullet" {
+			foundBullet = true
+		}
+		if e.Type == "rich_text_list" && e.Style == "ordered" {
+			foundOrdered = true
+		}
+	}
+	if !foundBullet {
+		t.Fatal("expected bullet list")
+	}
+	if !foundOrdered {
+		t.Fatal("expected ordered nested list")
+	}
+}
+
+func TestConvertBlocks_IndentedCodeBlock(t *testing.T) {
+	// Indented code block (4 spaces)
+	blocks := ConvertBlocks("    code line 1\n    code line 2")
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_preformatted" {
+		t.Fatalf("expected rich_text_preformatted, got %s", elem.Type)
+	}
+}
+
+func TestConvertBlocks_HTMLBlock(t *testing.T) {
+	blocks := ConvertBlocks("<div>hello</div>")
+	if len(blocks) == 0 {
+		t.Fatal("expected blocks for HTML content")
+	}
+}
+
+func TestConvertBlocks_RawHTMLInline(t *testing.T) {
+	blocks := ConvertBlocks("text <br> more")
+	il := inlines(t, blocks[0].Elements[0])
+	if len(il) == 0 {
+		t.Fatal("expected inlines for raw HTML")
+	}
+}
+
+func TestConvertBlocks_StyledMerging(t *testing.T) {
+	// Bold text next to non-bold should not merge
+	blocks := ConvertBlocks("**bold** normal")
+	il := inlines(t, blocks[0].Elements[0])
+	if len(il) != 2 {
+		t.Fatalf("expected 2 inlines, got %d", len(il))
+	}
+	if il[0].Style == nil || !il[0].Style.Bold {
+		t.Fatal("first inline should be bold")
+	}
+	if il[1].Style != nil {
+		t.Fatal("second inline should have no style")
+	}
+}
