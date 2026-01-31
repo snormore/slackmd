@@ -1,6 +1,6 @@
 # slackmd
 
-Go library and CLI tool for converting Markdown to Slack mrkdwn format.
+Go library and CLI tool for posting Markdown to Slack.
 
 ## Library
 
@@ -20,7 +20,7 @@ err := slackmd.Post(webhookURL, "**bold** and _italic_")
 // Post pre-built blocks
 err = slackmd.PostBlocks(webhookURL, blocks)
 
-// Post pre-converted mrkdwn (plain text fallback)
+// Post pre-converted mrkdwn text
 err = slackmd.PostMrkdwn(webhookURL, output)
 
 // Split long text into chunks (for custom posting logic)
@@ -46,7 +46,7 @@ slackmd input.md
 echo "**bold** and _italic_" | slackmd
 ```
 
-Post directly to Slack via incoming webhook (uses rich_text blocks for native formatting):
+Post directly to Slack via incoming webhook:
 
 ```
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
@@ -60,7 +60,7 @@ Or pass the webhook URL directly:
 slackmd -post -webhook "https://hooks.slack.com/services/T.../B.../..." input.md
 ```
 
-When printing to stdout, the CLI outputs mrkdwn text. When posting with `-post`, it uses rich_text blocks for native Slack formatting (nested lists, blockquotes, styled text).
+Stdout prints mrkdwn text. Posting with `-post` uses rich_text blocks for native Slack formatting.
 
 ### Setting up a Slack webhook
 
