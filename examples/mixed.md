@@ -1,6 +1,6 @@
-# Deploy Checklist
+# Deploy Checklist 🚢
 
-> **Warning**: Make sure CI is green before deploying!
+> ⚠️ **Warning**: Make sure CI is green before deploying!
 
 ## Steps
 
@@ -23,8 +23,8 @@
 
 ## Notes
 
-- ~~Old deploy process~~ is deprecated
-- Use the **new** pipeline _exclusively_
-- See `docs/deploy.md` for details
+- ❌ ~~Old deploy process~~ is deprecated
+- ✅ Use the **new** pipeline _exclusively_
+- 📖 See `docs/deploy.md` for details
 
-![architecture](https://example.com/arch.png)
+![architecture](https://go.dev/blog/gopher/header.jpg)

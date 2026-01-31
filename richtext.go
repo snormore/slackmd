@@ -11,11 +11,14 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// Block represents a Slack block (rich_text, header, or divider).
+// Block represents a Slack block (rich_text, header, divider, or image).
 type Block struct {
 	Type     string    `json:"type"`
 	Elements []Element `json:"elements,omitempty"`
 	Text     *TextObj  `json:"text,omitempty"`
+	ImageURL string    `json:"image_url,omitempty"`
+	AltText  string    `json:"alt_text,omitempty"`
+	Title    *TextObj  `json:"title,omitempty"`
 }
 
 // TextObj represents a plain_text object used by header blocks.
@@ -69,19 +72,10 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 	doc := md.Parser().Parse(reader)
 
 	var blocks []Block
-	var accum []Element
-
-	flush := func() {
-		if len(accum) > 0 {
-			blocks = append(blocks, Block{Type: "rich_text", Elements: accum})
-			accum = nil
-		}
-	}
 
 	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
 		switch child.Kind() {
 		case ast.KindHeading:
-			flush()
 			text := renderInlineChildrenPlain(source, child)
 			if len(text) > 150 {
 				text = text[:150]
@@ -91,16 +85,49 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 				Text: &TextObj{Type: "plain_text", Text: text},
 			})
 		case ast.KindThematicBreak:
-			flush()
 			blocks = append(blocks, Block{Type: "divider"})
+		case ast.KindParagraph:
+			if img := soleImage(child); img != nil {
+				url := string(img.Destination)
+				alt := renderInlineChildrenPlain(source, img)
+				if alt == "" {
+					alt = "image"
+				}
+				b := Block{Type: "image", ImageURL: url, AltText: alt}
+				title := renderInlineChildrenPlain(source, img)
+				if title != "" {
+					b.Title = &TextObj{Type: "plain_text", Text: title}
+				}
+				blocks = append(blocks, b)
+			} else {
+				elements := renderBlockNode(source, child)
+				if len(elements) > 0 {
+					blocks = append(blocks, Block{Type: "rich_text", Elements: elements})
+				}
+			}
 		default:
 			elements := renderBlockNode(source, child)
-			accum = append(accum, elements...)
+			if len(elements) > 0 {
+				blocks = append(blocks, Block{Type: "rich_text", Elements: elements})
+			}
 		}
 	}
 
-	flush()
 	return blocks
+}
+
+// soleImage returns the *ast.Image if the paragraph contains only a single
+// image (with no other content), otherwise nil.
+func soleImage(para ast.Node) *ast.Image {
+	child := para.FirstChild()
+	if child == nil || child.NextSibling() != nil {
+		return nil
+	}
+	img, ok := child.(*ast.Image)
+	if !ok {
+		return nil
+	}
+	return img
 }
 
 func renderBlockNode(source []byte, node ast.Node) []Element {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -30,7 +31,8 @@ func PostBlocks(webhookURL string, blocks []Block) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("slack returned %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("slack returned %s: %s", resp.Status, string(body))
 	}
 	return nil
 }
@@ -58,7 +60,8 @@ func postMessage(url, text string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("slack returned %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("slack returned %s: %s", resp.Status, string(body))
 	}
 	return nil
 }

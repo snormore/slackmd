@@ -2,6 +2,7 @@ package slackmd
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -158,6 +159,21 @@ func TestConvertBlocks_OrderedList(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_OrderedListRepeatedNumbers(t *testing.T) {
+	blocks := ConvertBlocks("1. first\n1. second\n1. third")
+	elems := blocks[0].Elements
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 list element, got %d", len(elems))
+	}
+	if elems[0].Style != "ordered" {
+		t.Fatalf("expected ordered style, got %s", elems[0].Style)
+	}
+	secs := sections(t, elems[0])
+	if len(secs) != 3 {
+		t.Fatalf("expected 3 sections, got %d", len(secs))
+	}
+}
+
 func TestConvertBlocks_NestedList(t *testing.T) {
 	blocks := ConvertBlocks("- a\n  - b\n    - c")
 	elems := blocks[0].Elements
@@ -247,22 +263,52 @@ func TestConvertBlocks_ThematicBreak(t *testing.T) {
 
 func TestConvertBlocks_Image(t *testing.T) {
 	blocks := ConvertBlocks("![alt text](https://example.com/img.png)")
-	il := inlines(t, blocks[0].Elements[0])
-	foundAlt := false
-	foundLink := false
-	for _, in := range il {
-		if in.Type == "text" && in.Text == "alt text " {
-			foundAlt = true
-		}
-		if in.Type == "link" && in.URL == "https://example.com/img.png" {
-			foundLink = true
-		}
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
 	}
-	if !foundAlt {
-		t.Fatal("expected alt text inline")
+	if blocks[0].Type != "image" {
+		t.Fatalf("expected image block, got %s", blocks[0].Type)
 	}
-	if !foundLink {
-		t.Fatal("expected image link inline")
+	if blocks[0].ImageURL != "https://example.com/img.png" {
+		t.Fatalf("expected image URL, got %q", blocks[0].ImageURL)
+	}
+	if blocks[0].AltText != "alt text" {
+		t.Fatalf("expected alt text 'alt text', got %q", blocks[0].AltText)
+	}
+}
+
+func TestConvertBlocks_HeadingTruncation(t *testing.T) {
+	long := strings.Repeat("A", 200)
+	blocks := ConvertBlocks("# " + long)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if len(blocks[0].Text.Text) != 150 {
+		t.Fatalf("expected 150 chars, got %d", len(blocks[0].Text.Text))
+	}
+}
+
+func TestConvertBlocks_HeadingBetweenContent(t *testing.T) {
+	blocks := ConvertBlocks("above\n\n## Title\n\nbelow")
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 blocks, got %d", len(blocks))
+	}
+	if blocks[0].Type != "rich_text" {
+		t.Fatalf("expected rich_text, got %s", blocks[0].Type)
+	}
+	if blocks[1].Type != "header" {
+		t.Fatalf("expected header, got %s", blocks[1].Type)
+	}
+	if blocks[2].Type != "rich_text" {
+		t.Fatalf("expected rich_text, got %s", blocks[2].Type)
+	}
+}
+
+func TestConvertBlocks_ImageInlineWithText(t *testing.T) {
+	// Image mixed with text in a paragraph should stay as rich_text, not become an image block
+	blocks := ConvertBlocks("see ![pic](https://example.com/img.png) here")
+	if blocks[0].Type != "rich_text" {
+		t.Fatalf("expected rich_text for inline image, got %s", blocks[0].Type)
 	}
 }
 
