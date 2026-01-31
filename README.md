@@ -2,6 +2,12 @@
 
 Go library and CLI tool for posting Markdown to Slack.
 
+Slack doesn't understand Markdown. It has its own formatting syntax (mrkdwn) which lacks features like nested lists, and a richer block-based format (rich_text) that supports them but requires constructing complex JSON payloads. Neither accepts Markdown directly.
+
+`slackmd` bridges that gap. Write standard Markdown and it handles the conversion — either to mrkdwn for simple cases, or to rich_text blocks for full-fidelity formatting with nested lists, blockquotes, code blocks, headers, dividers, images, and tables. It also handles Slack's payload limits automatically, chunking long messages and splitting large block payloads across multiple posts.
+
+Use it as a Go library to convert or post programmatically, or as a CLI tool to pipe Markdown files straight to a Slack channel.
+
 ## Library
 
 ```go
