@@ -58,12 +58,12 @@ Long messages are automatically split into multiple posts to stay within Slack's
 
 ### Setting up a Slack webhook
 
-1. Go to https://api.slack.com/apps and click **Create New App** > **From scratch**
-2. Name it whatever you like and pick your workspace
-3. Go to **Incoming Webhooks** and toggle it on
-4. Click **Add New Webhook to Workspace** and pick a channel
-5. Copy the webhook URL — it looks like `https://hooks.slack.com/services/T.../B.../...`
-6. Set it as an environment variable:
+1. Go to https://api.slack.com/apps and click **Create New App** > **From an app manifest**
+2. Select your workspace, then paste the contents of [`slack-app-manifest.yaml`](slack-app-manifest.yaml)
+3. Click **Create**
+4. Go to **Incoming Webhooks** and click **Add New Webhook to Workspace**
+5. Pick a channel and authorize
+6. Copy the webhook URL and set it as an environment variable:
    ```
    export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
    ```
