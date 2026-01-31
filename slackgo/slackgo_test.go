@@ -135,6 +135,57 @@ func TestToSlackBlocks_List(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_Quote(t *testing.T) {
+	blocks := ConvertBlocks("> quoted text")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	rt := blocks[0].(*slack.RichTextBlock)
+	q, ok := rt.Elements[0].(*slack.RichTextQuote)
+	if !ok {
+		t.Fatalf("expected RichTextQuote, got %T", rt.Elements[0])
+	}
+	if len(q.Elements) == 0 {
+		t.Fatal("expected at least one element in quote")
+	}
+	text, ok := q.Elements[0].(*slack.RichTextSectionTextElement)
+	if !ok {
+		t.Fatalf("expected TextElement, got %T", q.Elements[0])
+	}
+	if text.Text != "quoted text" {
+		t.Errorf("expected 'quoted text', got %q", text.Text)
+	}
+}
+
+func TestConvertBlocks_OrderedList(t *testing.T) {
+	blocks := ConvertBlocks("1. first\n2. second")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	rt := blocks[0].(*slack.RichTextBlock)
+	list, ok := rt.Elements[0].(*slack.RichTextList)
+	if !ok {
+		t.Fatalf("expected RichTextList, got %T", rt.Elements[0])
+	}
+	if list.Style != slack.RTEListOrdered {
+		t.Errorf("expected ordered style, got %s", list.Style)
+	}
+}
+
+func TestPostOptions(t *testing.T) {
+	var o postOptions
+
+	WithThreadTS("1234.5678")(&o)
+	if o.threadTS != "1234.5678" {
+		t.Errorf("expected threadTS '1234.5678', got %q", o.threadTS)
+	}
+
+	WithFallbackText("fallback")(&o)
+	if o.fallbackText != "fallback" {
+		t.Errorf("expected fallbackText 'fallback', got %q", o.fallbackText)
+	}
+}
+
 func TestToSlackBlocks_Image(t *testing.T) {
 	blocks := slackmd.ConvertBlocks("![alt text](https://example.com/img.png)")
 	result := ToSlackBlocks(blocks)

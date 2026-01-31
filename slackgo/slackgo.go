@@ -21,11 +21,44 @@ func ToSlackBlocks(blocks []slackmd.Block) []slack.Block {
 	return out
 }
 
+// PostOption configures Post behavior.
+type PostOption func(*postOptions)
+
+type postOptions struct {
+	threadTS     string
+	fallbackText string
+}
+
+// WithThreadTS sets the thread timestamp to reply in a thread.
+func WithThreadTS(ts string) PostOption {
+	return func(o *postOptions) { o.threadTS = ts }
+}
+
+// WithFallbackText sets fallback plain text for notifications and accessibility.
+func WithFallbackText(text string) PostOption {
+	return func(o *postOptions) { o.fallbackText = text }
+}
+
 // Post converts markdown to slack-go blocks and posts via client.PostMessage.
-func Post(api *slack.Client, channel, markdown string) error {
+// Returns the response timestamp of the posted message.
+func Post(api *slack.Client, channel, markdown string, opts ...PostOption) (string, error) {
+	var o postOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	blocks := ConvertBlocks(markdown)
-	_, _, err := api.PostMessage(channel, slack.MsgOptionBlocks(blocks...))
-	return err
+	msgOpts := []slack.MsgOption{slack.MsgOptionBlocks(blocks...)}
+
+	if o.threadTS != "" {
+		msgOpts = append(msgOpts, slack.MsgOptionTS(o.threadTS))
+	}
+	if o.fallbackText != "" {
+		msgOpts = append(msgOpts, slack.MsgOptionText(o.fallbackText, false))
+	}
+
+	_, ts, err := api.PostMessage(channel, msgOpts...)
+	return ts, err
 }
 
 func convertBlock(b slackmd.Block) slack.Block {

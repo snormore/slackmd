@@ -41,7 +41,13 @@ If you use [slack-go](https://github.com/slack-go/slack)'s `client.PostMessage`,
 import "github.com/snormore/slackmd/slackgo"
 
 // Convert and post in one call
-err := slackgo.Post(api, "#channel", "**bold** and _italic_")
+ts, err := slackgo.Post(api, "#channel", "**bold** and _italic_")
+
+// Reply in a thread
+_, err = slackgo.Post(api, "#channel", "threaded reply",
+	slackgo.WithThreadTS(ts),
+	slackgo.WithFallbackText("threaded reply"),
+)
 
 // Or convert to []slack.Block for custom use
 blocks := slackgo.ConvertBlocks("- a\n  - b")
