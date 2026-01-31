@@ -7,21 +7,27 @@ Go library and CLI tool for converting Markdown to Slack mrkdwn format.
 ```go
 import "github.com/snormore/slackmd"
 
-// Convert markdown to Slack mrkdwn
+// Convert markdown to Slack mrkdwn (plain text formatting)
 output := slackmd.Convert("**bold** and _italic_")
 // output: "*bold* and _italic_"
 
-// Convert and post to Slack in one call
+// Convert markdown to Slack rich_text blocks (native formatting)
+blocks := slackmd.ConvertBlocks("- a\n  - b\n    - c")
+
+// Post to Slack using rich_text blocks (native nested lists, quotes, etc.)
 err := slackmd.Post(webhookURL, "**bold** and _italic_")
 
-// Post pre-converted mrkdwn
-err := slackmd.PostMrkdwn(webhookURL, output)
+// Post pre-built blocks
+err = slackmd.PostBlocks(webhookURL, blocks)
+
+// Post pre-converted mrkdwn (plain text fallback)
+err = slackmd.PostMrkdwn(webhookURL, output)
 
 // Split long text into chunks (for custom posting logic)
 chunks := slackmd.Chunk(text, 3900)
 ```
 
-Long messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
+`Post()` and `PostBlocks()` use Slack's rich_text block format, which supports native nested lists, blockquotes, and styled text. `PostMrkdwn()` sends plain mrkdwn text for simpler use cases. Long mrkdwn messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
 
 ## CLI
 
@@ -40,7 +46,7 @@ slackmd input.md
 echo "**bold** and _italic_" | slackmd
 ```
 
-Post directly to Slack via incoming webhook:
+Post directly to Slack via incoming webhook (uses rich_text blocks for native formatting):
 
 ```
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
@@ -54,7 +60,7 @@ Or pass the webhook URL directly:
 slackmd -post -webhook "https://hooks.slack.com/services/T.../B.../..." input.md
 ```
 
-Long messages are automatically split into multiple posts to stay within Slack's message size limits. Code blocks are kept intact when possible.
+When printing to stdout, the CLI outputs mrkdwn text. When posting with `-post`, it uses rich_text blocks for native Slack formatting (nested lists, blockquotes, styled text).
 
 ### Setting up a Slack webhook
 
