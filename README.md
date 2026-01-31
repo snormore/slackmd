@@ -50,10 +50,18 @@ _, err = slackgo.Post(ctx, api, "#channel", "threaded reply",
 	slackgo.WithRetry(nil), // sensible defaults: 3 attempts, exponential backoff
 )
 
+// Update an existing message
+err = slackgo.Update(ctx, api, "#channel", ts, "updated **content**",
+	slackgo.WithFallbackText("updated content"),
+	slackgo.WithRetry(nil),
+)
+
 // Or convert to []slack.Block for custom use
 blocks := slackgo.ConvertBlocks("- a\n  - b")
 api.PostMessage("#channel", slack.MsgOptionBlocks(blocks...))
 ```
+
+Emoji shortcodes like `:wave:` and `:tada:` are automatically converted to native Slack emoji elements.
 
 The `slackgo` subpackage is optional — `github.com/slack-go/slack` is only pulled in as a dependency if you import it.
 

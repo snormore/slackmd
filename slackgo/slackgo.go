@@ -69,9 +69,19 @@ func WithRetry(cfg *RetryConfig) PostOption {
 	}
 }
 
+// poster abstracts the Slack API methods used by Post and Update.
+type poster interface {
+	PostMessageContext(ctx context.Context, channel string, opts ...slack.MsgOption) (string, string, error)
+	UpdateMessageContext(ctx context.Context, channel, timestamp string, opts ...slack.MsgOption) (string, string, string, error)
+}
+
 // Post converts markdown to slack-go blocks and posts via client.PostMessageContext.
 // Returns the response timestamp of the posted message.
 func Post(ctx context.Context, api *slack.Client, channel, markdown string, opts ...PostOption) (string, error) {
+	return post(ctx, api, channel, markdown, opts...)
+}
+
+func post(ctx context.Context, api poster, channel, markdown string, opts ...PostOption) (string, error) {
 	var o postOptions
 	for _, opt := range opts {
 		opt(&o)
@@ -116,6 +126,54 @@ func Post(ctx context.Context, api *slack.Client, channel, markdown string, opts
 		}
 	}
 	return ts, err
+}
+
+// Update converts markdown to slack-go blocks and updates an existing message.
+func Update(ctx context.Context, api *slack.Client, channel, timestamp, markdown string, opts ...PostOption) error {
+	return update(ctx, api, channel, timestamp, markdown, opts...)
+}
+
+func update(ctx context.Context, api poster, channel, timestamp, markdown string, opts ...PostOption) error {
+	var o postOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
+	blocks := ConvertBlocks(markdown)
+	msgOpts := []slack.MsgOption{slack.MsgOptionBlocks(blocks...)}
+
+	if o.fallbackText != "" {
+		msgOpts = append(msgOpts, slack.MsgOptionText(o.fallbackText, false))
+	}
+
+	if o.retry == nil {
+		_, _, _, err := api.UpdateMessageContext(ctx, channel, timestamp, msgOpts...)
+		return err
+	}
+
+	var err error
+	for attempt := range o.retry.MaxAttempts {
+		_, _, _, err = api.UpdateMessageContext(ctx, channel, timestamp, msgOpts...)
+		if err == nil {
+			return nil
+		}
+		if rateLimitedErr, ok := err.(*slack.RateLimitedError); ok {
+			wait := rateLimitedErr.RetryAfter
+			if wait == 0 {
+				wait = backoff(attempt, o.retry)
+			}
+			if err := sleep(ctx, wait); err != nil {
+				return err
+			}
+			continue
+		}
+		if attempt < o.retry.MaxAttempts-1 {
+			if err := sleep(ctx, backoff(attempt, o.retry)); err != nil {
+				return err
+			}
+		}
+	}
+	return err
 }
 
 func backoff(attempt int, cfg *RetryConfig) time.Duration {
@@ -256,6 +314,8 @@ func convertInlines(inlines []slackmd.Inline) []slack.RichTextSectionElement {
 
 func convertInline(in slackmd.Inline) slack.RichTextSectionElement {
 	switch in.Type {
+	case "emoji":
+		return slack.NewRichTextSectionEmojiElement(in.Text, 0, convertInlineStyle(in.Style))
 	case "link":
 		el := &slack.RichTextSectionLinkElement{
 			Type: slack.RTSELink,

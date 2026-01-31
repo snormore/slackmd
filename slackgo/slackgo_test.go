@@ -2,12 +2,38 @@ package slackgo
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/snormore/slackmd"
 )
+
+// fakePoster implements the poster interface for testing.
+type fakePoster struct {
+	calls    atomic.Int32
+	failN    int            // fail this many times before succeeding
+	err      error          // error to return on failure
+	returnTS string         // timestamp to return on success
+}
+
+func (f *fakePoster) PostMessageContext(_ context.Context, _ string, _ ...slack.MsgOption) (string, string, error) {
+	n := int(f.calls.Add(1))
+	if n <= f.failN {
+		return "", "", f.err
+	}
+	return "", f.returnTS, nil
+}
+
+func (f *fakePoster) UpdateMessageContext(_ context.Context, _, _ string, _ ...slack.MsgOption) (string, string, string, error) {
+	n := int(f.calls.Add(1))
+	if n <= f.failN {
+		return "", "", "", f.err
+	}
+	return "", "", f.returnTS, nil
+}
 
 func TestConvertBlocks_Paragraph(t *testing.T) {
 	blocks := ConvertBlocks("Hello **world**")
@@ -229,6 +255,31 @@ func TestSleep_ContextCanceled(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_Emoji(t *testing.T) {
+	blocks := ConvertBlocks("Hello :wave: world :tada:")
+	rt := blocks[0].(*slack.RichTextBlock)
+	section := rt.Elements[0].(*slack.RichTextSection)
+	if len(section.Elements) != 4 {
+		t.Fatalf("expected 4 inlines, got %d", len(section.Elements))
+	}
+	text0 := section.Elements[0].(*slack.RichTextSectionTextElement)
+	if text0.Text != "Hello " {
+		t.Errorf("expected 'Hello ', got %q", text0.Text)
+	}
+	emoji0 := section.Elements[1].(*slack.RichTextSectionEmojiElement)
+	if emoji0.Name != "wave" {
+		t.Errorf("expected 'wave', got %q", emoji0.Name)
+	}
+	text1 := section.Elements[2].(*slack.RichTextSectionTextElement)
+	if text1.Text != " world " {
+		t.Errorf("expected ' world ', got %q", text1.Text)
+	}
+	emoji1 := section.Elements[3].(*slack.RichTextSectionEmojiElement)
+	if emoji1.Name != "tada" {
+		t.Errorf("expected 'tada', got %q", emoji1.Name)
+	}
+}
+
 func TestToSlackBlocks_Image(t *testing.T) {
 	blocks := slackmd.ConvertBlocks("![alt text](https://example.com/img.png)")
 	result := ToSlackBlocks(blocks)
@@ -241,5 +292,195 @@ func TestToSlackBlocks_Image(t *testing.T) {
 	}
 	if img.ImageURL != "https://example.com/img.png" {
 		t.Errorf("unexpected image URL: %s", img.ImageURL)
+	}
+}
+
+func TestPost_Success(t *testing.T) {
+	fp := &fakePoster{returnTS: "1234.5678"}
+	ts, err := post(context.Background(), fp, "#test", "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ts != "1234.5678" {
+		t.Errorf("expected ts '1234.5678', got %q", ts)
+	}
+	if fp.calls.Load() != 1 {
+		t.Errorf("expected 1 call, got %d", fp.calls.Load())
+	}
+}
+
+func TestPost_WithOptions(t *testing.T) {
+	fp := &fakePoster{returnTS: "1234.5678"}
+	ts, err := post(context.Background(), fp, "#test", "hello",
+		WithThreadTS("0000.0000"),
+		WithFallbackText("fallback"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ts != "1234.5678" {
+		t.Errorf("expected ts '1234.5678', got %q", ts)
+	}
+}
+
+func TestPost_RetrySuccess(t *testing.T) {
+	fp := &fakePoster{
+		failN:    2,
+		err:      errors.New("temporary error"),
+		returnTS: "5678.1234",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	ts, err := post(context.Background(), fp, "#test", "hello", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ts != "5678.1234" {
+		t.Errorf("expected ts '5678.1234', got %q", ts)
+	}
+	if fp.calls.Load() != 3 {
+		t.Errorf("expected 3 calls, got %d", fp.calls.Load())
+	}
+}
+
+func TestPost_RetryExhausted(t *testing.T) {
+	retErr := errors.New("persistent error")
+	fp := &fakePoster{failN: 5, err: retErr}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	_, err := post(context.Background(), fp, "#test", "hello", WithRetry(cfg))
+	if err != retErr {
+		t.Errorf("expected persistent error, got %v", err)
+	}
+	if fp.calls.Load() != 3 {
+		t.Errorf("expected 3 calls, got %d", fp.calls.Load())
+	}
+}
+
+func TestPost_RetryRateLimited(t *testing.T) {
+	fp := &fakePoster{
+		failN:    1,
+		err:      &slack.RateLimitedError{RetryAfter: time.Millisecond},
+		returnTS: "rate.limited",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	ts, err := post(context.Background(), fp, "#test", "hello", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ts != "rate.limited" {
+		t.Errorf("expected ts 'rate.limited', got %q", ts)
+	}
+}
+
+func TestPost_RetryRateLimitedZeroRetryAfter(t *testing.T) {
+	fp := &fakePoster{
+		failN:    1,
+		err:      &slack.RateLimitedError{RetryAfter: 0},
+		returnTS: "rate.zero",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	ts, err := post(context.Background(), fp, "#test", "hello", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ts != "rate.zero" {
+		t.Errorf("expected ts 'rate.zero', got %q", ts)
+	}
+}
+
+func TestPost_RetryContextCanceled(t *testing.T) {
+	fp := &fakePoster{failN: 5, err: errors.New("fail")}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Second, MaxWait: 10 * time.Second}
+	_, err := post(ctx, fp, "#test", "hello", WithRetry(cfg))
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestUpdate_Success(t *testing.T) {
+	fp := &fakePoster{returnTS: "updated"}
+	err := update(context.Background(), fp, "#test", "1234.5678", "updated text")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fp.calls.Load() != 1 {
+		t.Errorf("expected 1 call, got %d", fp.calls.Load())
+	}
+}
+
+func TestUpdate_WithFallback(t *testing.T) {
+	fp := &fakePoster{returnTS: "updated"}
+	err := update(context.Background(), fp, "#test", "1234.5678", "updated text",
+		WithFallbackText("fallback"),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdate_RetrySuccess(t *testing.T) {
+	fp := &fakePoster{
+		failN:    1,
+		err:      errors.New("temporary"),
+		returnTS: "updated",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	err := update(context.Background(), fp, "#test", "1234.5678", "text", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fp.calls.Load() != 2 {
+		t.Errorf("expected 2 calls, got %d", fp.calls.Load())
+	}
+}
+
+func TestUpdate_RetryExhausted(t *testing.T) {
+	retErr := errors.New("persistent")
+	fp := &fakePoster{failN: 5, err: retErr}
+	cfg := &RetryConfig{MaxAttempts: 2, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	err := update(context.Background(), fp, "#test", "1234.5678", "text", WithRetry(cfg))
+	if err != retErr {
+		t.Errorf("expected persistent error, got %v", err)
+	}
+	if fp.calls.Load() != 2 {
+		t.Errorf("expected 2 calls, got %d", fp.calls.Load())
+	}
+}
+
+func TestUpdate_RetryContextCanceled(t *testing.T) {
+	fp := &fakePoster{failN: 5, err: errors.New("fail")}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Second, MaxWait: 10 * time.Second}
+	err := update(ctx, fp, "#test", "1234.5678", "text", WithRetry(cfg))
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestUpdate_RetryRateLimitedZeroRetryAfter(t *testing.T) {
+	fp := &fakePoster{
+		failN:    1,
+		err:      &slack.RateLimitedError{RetryAfter: 0},
+		returnTS: "updated",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	err := update(context.Background(), fp, "#test", "1234.5678", "text", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdate_RetryRateLimited(t *testing.T) {
+	fp := &fakePoster{
+		failN:    1,
+		err:      &slack.RateLimitedError{RetryAfter: time.Millisecond},
+		returnTS: "updated",
+	}
+	cfg := &RetryConfig{MaxAttempts: 3, InitialWait: time.Millisecond, MaxWait: 10 * time.Millisecond}
+	err := update(context.Background(), fp, "#test", "1234.5678", "text", WithRetry(cfg))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

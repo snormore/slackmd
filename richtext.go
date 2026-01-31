@@ -2,6 +2,7 @@ package slackmd
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -409,15 +410,33 @@ func collectInlinesWalk(source []byte, node ast.Node, style InlineStyle, inlines
 	}
 }
 
+var emojiPattern = regexp.MustCompile(`:([a-zA-Z0-9_+-]+):`)
+
 func addTextInline(inlines *[]Inline, text string, style InlineStyle) {
 	if text == "" {
 		return
 	}
-	inline := Inline{Type: "text", Text: text}
+	var sp *InlineStyle
 	if hasStyle(style) {
-		inline.Style = stylePtr(style)
+		sp = stylePtr(style)
 	}
-	*inlines = append(*inlines, inline)
+	matches := emojiPattern.FindAllStringIndex(text, -1)
+	if matches == nil {
+		*inlines = append(*inlines, Inline{Type: "text", Text: text, Style: sp})
+		return
+	}
+	pos := 0
+	for _, m := range matches {
+		if m[0] > pos {
+			*inlines = append(*inlines, Inline{Type: "text", Text: text[pos:m[0]], Style: sp})
+		}
+		name := text[m[0]+1 : m[1]-1]
+		*inlines = append(*inlines, Inline{Type: "emoji", Text: name, Style: sp})
+		pos = m[1]
+	}
+	if pos < len(text) {
+		*inlines = append(*inlines, Inline{Type: "text", Text: text[pos:], Style: sp})
+	}
 }
 
 func hasStyle(s InlineStyle) bool {
