@@ -12,10 +12,27 @@ import (
 
 const maxChunkRunes = 3900
 
-// Post converts markdown to Slack mrkdwn and posts it to the given webhook URL.
-// Long messages are automatically split into multiple posts.
+// Post converts markdown to Slack rich_text blocks and posts them to the given webhook URL.
 func Post(webhookURL, markdown string) error {
-	return PostMrkdwn(webhookURL, Convert(markdown))
+	blocks := ConvertBlocks(markdown)
+	return PostBlocks(webhookURL, blocks)
+}
+
+// PostBlocks posts rich_text blocks to the given webhook URL.
+func PostBlocks(webhookURL string, blocks []Block) error {
+	payload := map[string]interface{}{
+		"blocks": blocks,
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("slack returned %s", resp.Status)
+	}
+	return nil
 }
 
 // PostMrkdwn posts pre-converted mrkdwn text to the given webhook URL.

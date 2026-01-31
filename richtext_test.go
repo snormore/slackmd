@@ -1,0 +1,229 @@
+package slackmd
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func inlines(t *testing.T, elem Element) []Inline {
+	t.Helper()
+	v, ok := elem.Elements.([]Inline)
+	if !ok {
+		t.Fatalf("expected []Inline elements, got %T", elem.Elements)
+	}
+	return v
+}
+
+func sections(t *testing.T, elem Element) []Element {
+	t.Helper()
+	v, ok := elem.Elements.([]Element)
+	if !ok {
+		t.Fatalf("expected []Element elements, got %T", elem.Elements)
+	}
+	return v
+}
+
+func TestConvertBlocks_BasicText(t *testing.T) {
+	blocks := ConvertBlocks("Hello world")
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].Type != "rich_text" {
+		t.Fatalf("expected rich_text block, got %s", blocks[0].Type)
+	}
+	if len(blocks[0].Elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(blocks[0].Elements))
+	}
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_section" {
+		t.Fatalf("expected rich_text_section, got %s", elem.Type)
+	}
+	il := inlines(t, elem)
+	if len(il) != 1 {
+		t.Fatalf("expected 1 inline, got %d", len(il))
+	}
+	if il[0].Text != "Hello world" {
+		t.Fatalf("expected 'Hello world', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_Bold(t *testing.T) {
+	blocks := ConvertBlocks("**bold text**")
+	il := inlines(t, blocks[0].Elements[0])
+	if len(il) != 1 {
+		t.Fatalf("expected 1 inline, got %d", len(il))
+	}
+	if il[0].Style == nil || !il[0].Style.Bold {
+		t.Fatal("expected bold style")
+	}
+	if il[0].Text != "bold text" {
+		t.Fatalf("expected 'bold text', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_Italic(t *testing.T) {
+	blocks := ConvertBlocks("*italic text*")
+	il := inlines(t, blocks[0].Elements[0])
+	if il[0].Style == nil || !il[0].Style.Italic {
+		t.Fatal("expected italic style")
+	}
+}
+
+func TestConvertBlocks_Strikethrough(t *testing.T) {
+	blocks := ConvertBlocks("~~struck~~")
+	il := inlines(t, blocks[0].Elements[0])
+	if il[0].Style == nil || !il[0].Style.Strike {
+		t.Fatal("expected strike style")
+	}
+}
+
+func TestConvertBlocks_InlineCode(t *testing.T) {
+	blocks := ConvertBlocks("`code`")
+	il := inlines(t, blocks[0].Elements[0])
+	if il[0].Style == nil || !il[0].Style.Code {
+		t.Fatal("expected code style")
+	}
+	if il[0].Text != "code" {
+		t.Fatalf("expected 'code', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_CodeBlock(t *testing.T) {
+	blocks := ConvertBlocks("```\nfoo\nbar\n```")
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_preformatted" {
+		t.Fatalf("expected rich_text_preformatted, got %s", elem.Type)
+	}
+	il := inlines(t, elem)
+	if il[0].Text != "foo\nbar" {
+		t.Fatalf("expected 'foo\\nbar', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_Heading(t *testing.T) {
+	blocks := ConvertBlocks("# Heading")
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_section" {
+		t.Fatalf("expected rich_text_section, got %s", elem.Type)
+	}
+	il := inlines(t, elem)
+	if il[0].Style == nil || !il[0].Style.Bold {
+		t.Fatal("expected bold style for heading")
+	}
+	if il[0].Text != "Heading" {
+		t.Fatalf("expected 'Heading', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_Blockquote(t *testing.T) {
+	blocks := ConvertBlocks("> quoted text")
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_quote" {
+		t.Fatalf("expected rich_text_quote, got %s", elem.Type)
+	}
+}
+
+func TestConvertBlocks_BulletList(t *testing.T) {
+	blocks := ConvertBlocks("- a\n- b\n- c")
+	elems := blocks[0].Elements
+	// Should be grouped into 1 rich_text_list with 3 sections
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 list element, got %d", len(elems))
+	}
+	if elems[0].Type != "rich_text_list" {
+		t.Fatalf("expected rich_text_list, got %s", elems[0].Type)
+	}
+	if elems[0].Style != "bullet" {
+		t.Fatalf("expected bullet style, got %s", elems[0].Style)
+	}
+	secs := sections(t, elems[0])
+	if len(secs) != 3 {
+		t.Fatalf("expected 3 sections, got %d", len(secs))
+	}
+}
+
+func TestConvertBlocks_OrderedList(t *testing.T) {
+	blocks := ConvertBlocks("1. first\n2. second")
+	elems := blocks[0].Elements
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 list element, got %d", len(elems))
+	}
+	if elems[0].Style != "ordered" {
+		t.Fatalf("expected ordered style, got %s", elems[0].Style)
+	}
+	secs := sections(t, elems[0])
+	if len(secs) != 2 {
+		t.Fatalf("expected 2 sections, got %d", len(secs))
+	}
+}
+
+func TestConvertBlocks_NestedList(t *testing.T) {
+	blocks := ConvertBlocks("- a\n  - b\n    - c")
+	elems := blocks[0].Elements
+	// Should be 3 separate list elements with increasing indent
+	if len(elems) != 3 {
+		t.Fatalf("expected 3 list elements, got %d", len(elems))
+	}
+	if elems[0].Indent != 0 {
+		t.Fatalf("expected indent 0, got %d", elems[0].Indent)
+	}
+	if elems[1].Indent != 1 {
+		t.Fatalf("expected indent 1, got %d", elems[1].Indent)
+	}
+	if elems[2].Indent != 2 {
+		t.Fatalf("expected indent 2, got %d", elems[2].Indent)
+	}
+}
+
+func TestConvertBlocks_Link(t *testing.T) {
+	blocks := ConvertBlocks("[click](https://example.com)")
+	il := inlines(t, blocks[0].Elements[0])
+	if il[0].Type != "link" {
+		t.Fatalf("expected link type, got %s", il[0].Type)
+	}
+	if il[0].URL != "https://example.com" {
+		t.Fatalf("expected URL, got %q", il[0].URL)
+	}
+	if il[0].Text != "click" {
+		t.Fatalf("expected 'click', got %q", il[0].Text)
+	}
+}
+
+func TestConvertBlocks_JSONOutput(t *testing.T) {
+	blocks := ConvertBlocks("**hello**")
+	data, err := json.Marshal(blocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed []map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if parsed[0]["type"] != "rich_text" {
+		t.Fatal("expected rich_text type in JSON")
+	}
+}
+
+func TestConvertBlocks_Table(t *testing.T) {
+	md := "| A | B |\n|---|---|\n| 1 | 2 |"
+	blocks := ConvertBlocks(md)
+	elem := blocks[0].Elements[0]
+	if elem.Type != "rich_text_preformatted" {
+		t.Fatalf("expected rich_text_preformatted for table, got %s", elem.Type)
+	}
+}
+
+func TestConvertBlocks_TaskCheckbox(t *testing.T) {
+	blocks := ConvertBlocks("- [x] done\n- [ ] todo")
+	elems := blocks[0].Elements
+	if len(elems) != 1 {
+		t.Fatalf("expected 1 list element, got %d", len(elems))
+	}
+}
+
+func TestConvertBlocks_Empty(t *testing.T) {
+	blocks := ConvertBlocks("")
+	if len(blocks) != 0 {
+		t.Fatalf("expected 0 blocks, got %d", len(blocks))
+	}
+}

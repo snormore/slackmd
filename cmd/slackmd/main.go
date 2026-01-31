@@ -45,7 +45,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := slackmd.PostMrkdwn(url, output); err != nil {
+	if err := slackmd.Post(url, string(input)); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
