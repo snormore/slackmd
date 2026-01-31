@@ -11,10 +11,17 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// Block represents a Slack rich_text block.
+// Block represents a Slack block (rich_text, header, or divider).
 type Block struct {
 	Type     string    `json:"type"`
-	Elements []Element `json:"elements"`
+	Elements []Element `json:"elements,omitempty"`
+	Text     *TextObj  `json:"text,omitempty"`
+}
+
+// TextObj represents a plain_text object used by header blocks.
+type TextObj struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 // Element represents an element within a rich_text block (section, list, preformatted, quote).
@@ -62,16 +69,37 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 	doc := md.Parser().Parse(reader)
 
 	var blocks []Block
-	block := Block{Type: "rich_text"}
+	var accum []Element
+
+	flush := func() {
+		if len(accum) > 0 {
+			blocks = append(blocks, Block{Type: "rich_text", Elements: accum})
+			accum = nil
+		}
+	}
 
 	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
-		elements := renderBlockNode(source, child)
-		block.Elements = append(block.Elements, elements...)
+		switch child.Kind() {
+		case ast.KindHeading:
+			flush()
+			text := renderInlineChildrenPlain(source, child)
+			if len(text) > 150 {
+				text = text[:150]
+			}
+			blocks = append(blocks, Block{
+				Type: "header",
+				Text: &TextObj{Type: "plain_text", Text: text},
+			})
+		case ast.KindThematicBreak:
+			flush()
+			blocks = append(blocks, Block{Type: "divider"})
+		default:
+			elements := renderBlockNode(source, child)
+			accum = append(accum, elements...)
+		}
 	}
 
-	if len(block.Elements) > 0 {
-		blocks = append(blocks, block)
-	}
+	flush()
 	return blocks
 }
 
@@ -79,19 +107,12 @@ func renderBlockNode(source []byte, node ast.Node) []Element {
 	switch node.Kind() {
 	case ast.KindParagraph:
 		return []Element{renderSection(source, node)}
-	case ast.KindHeading:
-		return []Element{renderHeadingBlock(source, node)}
 	case ast.KindCodeBlock, ast.KindFencedCodeBlock:
 		return []Element{renderPreformatted(source, node)}
 	case ast.KindBlockquote:
 		return []Element{renderQuote(source, node)}
 	case ast.KindList:
 		return renderList(source, node)
-	case ast.KindThematicBreak:
-		return []Element{{
-			Type:     "rich_text_section",
-			Elements: []Inline{{Type: "text", Text: "———"}},
-		}}
 	case ast.KindHTMLBlock:
 		return []Element{renderSection(source, node)}
 	}
@@ -104,13 +125,6 @@ func renderBlockNode(source []byte, node ast.Node) []Element {
 
 func renderSection(source []byte, node ast.Node) Element {
 	inlines := collectInlines(source, node, InlineStyle{})
-	return Element{Type: "rich_text_section", Elements: inlines}
-}
-
-func renderHeadingBlock(source []byte, node ast.Node) Element {
-	// Render heading as bold section
-	boldStyle := InlineStyle{Bold: true}
-	inlines := collectInlines(source, node, boldStyle)
 	return Element{Type: "rich_text_section", Elements: inlines}
 }
 

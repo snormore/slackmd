@@ -102,16 +102,17 @@ func TestConvertBlocks_CodeBlock(t *testing.T) {
 
 func TestConvertBlocks_Heading(t *testing.T) {
 	blocks := ConvertBlocks("# Heading")
-	elem := blocks[0].Elements[0]
-	if elem.Type != "rich_text_section" {
-		t.Fatalf("expected rich_text_section, got %s", elem.Type)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
 	}
-	il := inlines(t, elem)
-	if il[0].Style == nil || !il[0].Style.Bold {
-		t.Fatal("expected bold style for heading")
+	if blocks[0].Type != "header" {
+		t.Fatalf("expected header block, got %s", blocks[0].Type)
 	}
-	if il[0].Text != "Heading" {
-		t.Fatalf("expected 'Heading', got %q", il[0].Text)
+	if blocks[0].Text == nil || blocks[0].Text.Text != "Heading" {
+		t.Fatalf("expected text 'Heading', got %+v", blocks[0].Text)
+	}
+	if blocks[0].Text.Type != "plain_text" {
+		t.Fatalf("expected plain_text type, got %s", blocks[0].Text.Type)
 	}
 }
 
@@ -230,15 +231,17 @@ func TestConvertBlocks_Empty(t *testing.T) {
 
 func TestConvertBlocks_ThematicBreak(t *testing.T) {
 	blocks := ConvertBlocks("above\n\n---\n\nbelow")
-	found := false
-	for _, elem := range blocks[0].Elements {
-		il, ok := elem.Elements.([]Inline)
-		if ok && len(il) == 1 && il[0].Text == "———" {
-			found = true
-		}
+	if len(blocks) != 3 {
+		t.Fatalf("expected 3 blocks, got %d", len(blocks))
 	}
-	if !found {
-		t.Fatal("expected thematic break element with ——— text")
+	if blocks[0].Type != "rich_text" {
+		t.Fatalf("expected rich_text, got %s", blocks[0].Type)
+	}
+	if blocks[1].Type != "divider" {
+		t.Fatalf("expected divider, got %s", blocks[1].Type)
+	}
+	if blocks[2].Type != "rich_text" {
+		t.Fatalf("expected rich_text, got %s", blocks[2].Type)
 	}
 }
 
