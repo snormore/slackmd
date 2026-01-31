@@ -25,10 +25,7 @@ const maxBlocksPerMessage = 50
 // Long messages are automatically split into multiple posts of up to 50 blocks each.
 func PostBlocks(webhookURL string, blocks []Block) error {
 	for i := 0; i < len(blocks); i += maxBlocksPerMessage {
-		end := i + maxBlocksPerMessage
-		if end > len(blocks) {
-			end = len(blocks)
-		}
+		end := min(i+maxBlocksPerMessage, len(blocks))
 		if i > 0 {
 			time.Sleep(time.Second)
 		}
@@ -40,7 +37,7 @@ func PostBlocks(webhookURL string, blocks []Block) error {
 }
 
 func postBlocks(webhookURL string, blocks []Block) error {
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"blocks": blocks,
 	}
 	body, _ := json.Marshal(payload)
