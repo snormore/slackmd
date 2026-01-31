@@ -1,4 +1,4 @@
-module github.com/snormore/slack-markdown
+module github.com/snormore/slackmd
 
 go 1.25.6
 

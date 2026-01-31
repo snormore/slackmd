@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	slackmd "github.com/snormore/slack-markdown"
+	"github.com/snormore/slackmd"
 )
 
 func main() {
