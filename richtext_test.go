@@ -515,8 +515,8 @@ func TestConvertBlocks_Emoji(t *testing.T) {
 	if elems[0].Type != "text" || elems[0].Text != "Hello " {
 		t.Errorf("expected text 'Hello ', got %q", elems[0].Text)
 	}
-	if elems[1].Type != "emoji" || elems[1].Text != "wave" {
-		t.Errorf("expected emoji 'wave', got type=%q text=%q", elems[1].Type, elems[1].Text)
+	if elems[1].Type != "emoji" || elems[1].Name != "wave" {
+		t.Errorf("expected emoji 'wave', got type=%q text=%q", elems[1].Type, elems[1].Name)
 	}
 	if elems[2].Type != "text" || elems[2].Text != " world" {
 		t.Errorf("expected text ' world', got %q", elems[2].Text)
@@ -529,8 +529,8 @@ func TestConvertBlocks_EmojiOnly(t *testing.T) {
 	if len(elems) != 1 {
 		t.Fatalf("expected 1 inline, got %d", len(elems))
 	}
-	if elems[0].Type != "emoji" || elems[0].Text != "thumbsup" {
-		t.Errorf("expected emoji 'thumbsup', got type=%q text=%q", elems[0].Type, elems[0].Text)
+	if elems[0].Type != "emoji" || elems[0].Name != "thumbsup" {
+		t.Errorf("expected emoji 'thumbsup', got type=%q name=%q", elems[0].Type, elems[0].Name)
 	}
 }
 
@@ -540,8 +540,8 @@ func TestConvertBlocks_EmojiWithPlus(t *testing.T) {
 	if len(elems) != 1 {
 		t.Fatalf("expected 1 inline, got %d", len(elems))
 	}
-	if elems[0].Type != "emoji" || elems[0].Text != "+1" {
-		t.Errorf("expected emoji '+1', got type=%q text=%q", elems[0].Type, elems[0].Text)
+	if elems[0].Type != "emoji" || elems[0].Name != "+1" {
+		t.Errorf("expected emoji '+1', got type=%q name=%q", elems[0].Type, elems[0].Name)
 	}
 }
 
@@ -551,7 +551,7 @@ func TestConvertBlocks_NoFalseEmoji(t *testing.T) {
 	elems := inlines(t, blocks[0].Elements[0])
 	// "30" matches [a-zA-Z0-9_+-]+ so :30: is treated as emoji — verify the pattern works as expected
 	for _, e := range elems {
-		if e.Type == "emoji" && e.Text == "30" {
+		if e.Type == "emoji" && e.Name == "30" {
 			// This is expected behavior — numeric colons match the pattern
 			return
 		}

@@ -1,6 +1,6 @@
-# Deploy Checklist 🚢
+# Deploy Checklist :ship:
 
-> ⚠️ **Warning**: Make sure CI is green before deploying!
+> :warning: **Warning**: Make sure CI is green before deploying!
 
 ## Steps
 
@@ -11,6 +11,7 @@
    ```
 3. Check the [changelog](https://example.com/changelog)
 4. Tag the release: `git tag v2.0.0`
+5. Verify the [deploy dashboard](https://example.com/deploy)
 
 ---
 
@@ -23,8 +24,9 @@
 
 ## Notes
 
-- ❌ ~~Old deploy process~~ is deprecated
-- ✅ Use the **new** pipeline _exclusively_
-- 📖 See `docs/deploy.md` for details
+- :x: ~~Old deploy process~~ is deprecated
+- :white_check_mark: Use the **new** pipeline _exclusively_
+- :book: See `docs/deploy.md` for details
+- :link: Reference the [runbook](https://example.com/runbook) and [incident process](https://example.com/incidents)
 
 ![architecture](https://go.dev/blog/gopher/header.jpg)

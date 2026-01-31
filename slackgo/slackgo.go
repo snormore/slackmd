@@ -315,7 +315,7 @@ func convertInlines(inlines []slackmd.Inline) []slack.RichTextSectionElement {
 func convertInline(in slackmd.Inline) slack.RichTextSectionElement {
 	switch in.Type {
 	case "emoji":
-		return slack.NewRichTextSectionEmojiElement(in.Text, 0, convertInlineStyle(in.Style))
+		return slack.NewRichTextSectionEmojiElement(in.Name, 0, convertInlineStyle(in.Style))
 	case "link":
 		el := &slack.RichTextSectionLinkElement{
 			Type: slack.RTSELink,

@@ -43,6 +43,7 @@ type Element struct {
 type Inline struct {
 	Type  string       `json:"type"`
 	Text  string       `json:"text,omitempty"`
+	Name  string       `json:"name,omitempty"`
 	URL   string       `json:"url,omitempty"`
 	Style *InlineStyle `json:"style,omitempty"`
 }
@@ -431,7 +432,7 @@ func addTextInline(inlines *[]Inline, text string, style InlineStyle) {
 			*inlines = append(*inlines, Inline{Type: "text", Text: text[pos:m[0]], Style: sp})
 		}
 		name := text[m[0]+1 : m[1]-1]
-		*inlines = append(*inlines, Inline{Type: "emoji", Text: name, Style: sp})
+		*inlines = append(*inlines, Inline{Type: "emoji", Name: name, Style: sp})
 		pos = m[1]
 	}
 	if pos < len(text) {
