@@ -33,6 +33,23 @@ err = slackmd.PostMrkdwn(webhookURL, output)
 chunks := slackmd.Chunk(text, 3900)
 ```
 
+### Using with slack-go client
+
+If you use [slack-go](https://github.com/slack-go/slack)'s `client.PostMessage`, import the `slackgo` subpackage to get `[]slack.Block` directly:
+
+```go
+import "github.com/snormore/slackmd/slackgo"
+
+// Convert and post in one call
+err := slackgo.Post(api, "#channel", "**bold** and _italic_")
+
+// Or convert to []slack.Block for custom use
+blocks := slackgo.ConvertBlocks("- a\n  - b")
+api.PostMessage("#channel", slack.MsgOptionBlocks(blocks...))
+```
+
+The `slackgo` subpackage is optional — `github.com/slack-go/slack` is only pulled in as a dependency if you import it.
+
 `Post()` and `PostBlocks()` use Slack's rich_text block format, which supports native nested lists, blockquotes, styled text, headers, dividers, and image blocks. Messages with more than 50 blocks are automatically split into multiple posts. `PostMrkdwn()` sends plain mrkdwn text for simpler use cases. Long mrkdwn messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
 
 ## CLI
