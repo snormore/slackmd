@@ -72,10 +72,31 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 	doc := md.Parser().Parse(reader)
 
 	var blocks []Block
+	var accum []Element
+
+	spacer := Element{Type: "rich_text_section", Elements: []Inline{{Type: "text", Text: "\n"}}}
+
+	flush := func() {
+		if len(accum) > 0 {
+			blocks = append(blocks, Block{Type: "rich_text", Elements: accum})
+			accum = nil
+		}
+	}
+
+	appendRichText := func(elements []Element) {
+		if len(elements) == 0 {
+			return
+		}
+		if len(accum) > 0 {
+			accum = append(accum, spacer)
+		}
+		accum = append(accum, elements...)
+	}
 
 	for child := doc.FirstChild(); child != nil; child = child.NextSibling() {
 		switch child.Kind() {
 		case ast.KindHeading:
+			flush()
 			text := renderInlineChildrenPlain(source, child)
 			if len(text) > 150 {
 				text = text[:150]
@@ -85,9 +106,11 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 				Text: &TextObj{Type: "plain_text", Text: text},
 			})
 		case ast.KindThematicBreak:
+			flush()
 			blocks = append(blocks, Block{Type: "divider"})
 		case ast.KindParagraph:
 			if img := soleImage(child); img != nil {
+				flush()
 				url := string(img.Destination)
 				alt := renderInlineChildrenPlain(source, img)
 				if alt == "" {
@@ -100,19 +123,14 @@ func (bc *BlockConverter) ConvertBlocks(markdown string) []Block {
 				}
 				blocks = append(blocks, b)
 			} else {
-				elements := renderBlockNode(source, child)
-				if len(elements) > 0 {
-					blocks = append(blocks, Block{Type: "rich_text", Elements: elements})
-				}
+				appendRichText(renderBlockNode(source, child))
 			}
 		default:
-			elements := renderBlockNode(source, child)
-			if len(elements) > 0 {
-				blocks = append(blocks, Block{Type: "rich_text", Elements: elements})
-			}
+			appendRichText(renderBlockNode(source, child))
 		}
 	}
 
+	flush()
 	return blocks
 }
 
