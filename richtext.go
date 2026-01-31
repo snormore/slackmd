@@ -6,8 +6,8 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
-	east "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/extension"
+	east "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -470,5 +470,3 @@ func collectTableRowsRT(source []byte, table *east.Table) [][]string {
 	}
 	return rows
 }
-
-

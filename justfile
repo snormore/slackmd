@@ -1,8 +1,8 @@
 # Default recipe
 default: check
 
-# Run all checks (build, test, vet)
-check: build test vet
+# Run all checks (build, test, vet, fmt)
+check: build test vet fmt
 
 # Build all packages
 build:
@@ -15,6 +15,10 @@ test:
 # Run go vet
 vet:
     go vet ./...
+
+# Check formatting
+fmt:
+    @test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
 
 # Run the CLI on an example file
 example file="examples/long-form.md":

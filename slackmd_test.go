@@ -159,15 +159,15 @@ func TestConvert(t *testing.T) {
 
 		// Tables
 		{
-			name:  "simple table",
-			input: "| A | B |\n|---|---|\n| 1 | 2 |",
+			name:     "simple table",
+			input:    "| A | B |\n|---|---|\n| 1 | 2 |",
 			expected: "```\n+---+---+\n| A | B |\n+---+---+\n| 1 | 2 |\n+---+---+\n```\n",
 		},
 
 		// Multiple blocks
 		{
-			name:  "paragraph then list",
-			input: "Hello\n\n- one\n- two",
+			name:     "paragraph then list",
+			input:    "Hello\n\n- one\n- two",
 			expected: "Hello\n\n• one\n• two\n",
 		},
 

@@ -502,7 +502,6 @@ func (r *SlackRenderer) renderInlineNode(buf *bytes.Buffer, source []byte, node 
 	}
 }
 
-
 func (r *SlackRenderer) renderTableHeader(w util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	return ast.WalkContinue, nil
 }
@@ -540,10 +539,10 @@ type bufWriterAdapter struct {
 }
 
 func (b *bufWriterAdapter) Write(p []byte) (int, error)       { return b.buf.Write(p) }
-func (b *bufWriterAdapter) WriteByte(c byte) error             { return b.buf.WriteByte(c) }
-func (b *bufWriterAdapter) WriteRune(r rune) (int, error)      { return b.buf.WriteRune(r) }
-func (b *bufWriterAdapter) WriteString(s string) (int, error)  { return b.buf.WriteString(s) }
-func (b *bufWriterAdapter) Flush() error                       { return nil }
-func (b *bufWriterAdapter) Available() int                     { return 0 }
-func (b *bufWriterAdapter) Buffered() int                      { return b.buf.Len() }
-func (b *bufWriterAdapter) Bytes() []byte                      { return b.buf.Bytes() }
+func (b *bufWriterAdapter) WriteByte(c byte) error            { return b.buf.WriteByte(c) }
+func (b *bufWriterAdapter) WriteRune(r rune) (int, error)     { return b.buf.WriteRune(r) }
+func (b *bufWriterAdapter) WriteString(s string) (int, error) { return b.buf.WriteString(s) }
+func (b *bufWriterAdapter) Flush() error                      { return nil }
+func (b *bufWriterAdapter) Available() int                    { return 0 }
+func (b *bufWriterAdapter) Buffered() int                     { return b.buf.Len() }
+func (b *bufWriterAdapter) Bytes() []byte                     { return b.buf.Bytes() }
