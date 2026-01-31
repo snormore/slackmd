@@ -7,9 +7,21 @@ Go library and CLI tool for converting Markdown to Slack mrkdwn format.
 ```go
 import "github.com/snormore/slackmd"
 
+// Convert markdown to Slack mrkdwn
 output := slackmd.Convert("**bold** and _italic_")
 // output: "*bold* and _italic_"
+
+// Convert and post to Slack in one call
+err := slackmd.Post(webhookURL, "**bold** and _italic_")
+
+// Post pre-converted mrkdwn
+err := slackmd.PostMrkdwn(webhookURL, output)
+
+// Split long text into chunks (for custom posting logic)
+chunks := slackmd.Chunk(text, 3900)
 ```
+
+Long messages are automatically chunked at paragraph boundaries, preserving code blocks intact.
 
 ## CLI
 
