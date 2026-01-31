@@ -545,6 +545,26 @@ func TestConvertBlocks_EmojiWithPlus(t *testing.T) {
 	}
 }
 
+func TestConvertBlocks_EmojiInStyledText(t *testing.T) {
+	blocks := ConvertBlocks("_:hourglass_flowing_sand: Understanding your question..._")
+	elems := inlines(t, blocks[0].Elements[0])
+	if len(elems) != 2 {
+		t.Fatalf("expected 2 inlines, got %d", len(elems))
+	}
+	if elems[0].Type != "emoji" || elems[0].Name != "hourglass_flowing_sand" {
+		t.Errorf("expected emoji 'hourglass_flowing_sand', got type=%q name=%q", elems[0].Type, elems[0].Name)
+	}
+	if elems[0].Style != nil {
+		t.Errorf("emoji should not carry style, got %+v", elems[0].Style)
+	}
+	if elems[1].Type != "text" || elems[1].Text != " Understanding your question..." {
+		t.Errorf("expected italic text, got type=%q text=%q", elems[1].Type, elems[1].Text)
+	}
+	if elems[1].Style == nil || !elems[1].Style.Italic {
+		t.Errorf("expected italic style on text")
+	}
+}
+
 func TestConvertBlocks_NoFalseEmoji(t *testing.T) {
 	// Colons in normal text shouldn't be treated as emoji
 	blocks := ConvertBlocks("time is 10:30:00")

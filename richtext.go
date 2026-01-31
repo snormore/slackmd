@@ -300,7 +300,37 @@ func groupListEntries(entries []listEntry) []Element {
 func collectInlines(source []byte, node ast.Node, baseStyle InlineStyle) []Inline {
 	var inlines []Inline
 	collectInlinesWalk(source, node, baseStyle, &inlines)
-	return mergeInlines(inlines)
+	return splitEmoji(mergeInlines(inlines))
+}
+
+// splitEmoji scans merged inlines for :emoji: patterns in text elements and
+// splits them into separate emoji elements. Emoji elements do not carry style.
+func splitEmoji(inlines []Inline) []Inline {
+	var out []Inline
+	for _, in := range inlines {
+		if in.Type != "text" {
+			out = append(out, in)
+			continue
+		}
+		matches := emojiPattern.FindAllStringIndex(in.Text, -1)
+		if matches == nil {
+			out = append(out, in)
+			continue
+		}
+		pos := 0
+		for _, m := range matches {
+			if m[0] > pos {
+				out = append(out, Inline{Type: "text", Text: in.Text[pos:m[0]], Style: in.Style})
+			}
+			name := in.Text[m[0]+1 : m[1]-1]
+			out = append(out, Inline{Type: "emoji", Name: name})
+			pos = m[1]
+		}
+		if pos < len(in.Text) {
+			out = append(out, Inline{Type: "text", Text: in.Text[pos:], Style: in.Style})
+		}
+	}
+	return out
 }
 
 // mergeInlines merges adjacent text inlines with the same style.
@@ -417,27 +447,11 @@ func addTextInline(inlines *[]Inline, text string, style InlineStyle) {
 	if text == "" {
 		return
 	}
-	var sp *InlineStyle
+	inline := Inline{Type: "text", Text: text}
 	if hasStyle(style) {
-		sp = stylePtr(style)
+		inline.Style = stylePtr(style)
 	}
-	matches := emojiPattern.FindAllStringIndex(text, -1)
-	if matches == nil {
-		*inlines = append(*inlines, Inline{Type: "text", Text: text, Style: sp})
-		return
-	}
-	pos := 0
-	for _, m := range matches {
-		if m[0] > pos {
-			*inlines = append(*inlines, Inline{Type: "text", Text: text[pos:m[0]], Style: sp})
-		}
-		name := text[m[0]+1 : m[1]-1]
-		*inlines = append(*inlines, Inline{Type: "emoji", Name: name, Style: sp})
-		pos = m[1]
-	}
-	if pos < len(text) {
-		*inlines = append(*inlines, Inline{Type: "text", Text: text[pos:], Style: sp})
-	}
+	*inlines = append(*inlines, inline)
 }
 
 func hasStyle(s InlineStyle) bool {
