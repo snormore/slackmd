@@ -246,17 +246,15 @@ func convertElement(e slackmd.Element) slack.RichTextElement {
 		}
 	case "rich_text_preformatted":
 		return &slack.RichTextPreformatted{
-			RichTextSection: slack.RichTextSection{
-				Type:     slack.RTEPreformatted,
-				Elements: convertInlines(extractInlines(e.Elements)),
-			},
-			Border: e.Border,
+			Type:     slack.RTEPreformatted,
+			Elements: convertInlines(extractInlines(e.Elements)),
+			Border:   e.Border,
 		}
 	case "rich_text_quote":
-		return (*slack.RichTextQuote)(&slack.RichTextSection{
+		return &slack.RichTextQuote{
 			Type:     slack.RTEQuote,
 			Elements: convertInlines(extractInlines(e.Elements)),
-		})
+		}
 	case "rich_text_list":
 		style := slack.RTEListBullet
 		if e.Style == "ordered" {
